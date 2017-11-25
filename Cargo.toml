@@ -1,0 +1,9 @@
+[package]
+name = "rs-tracer"
+version = "0.1.0"
+authors = ["James Pettigrew <james@innovum.com.au>"]
+
+[dependencies]
+cgmath = "0.15.0"
+image = "0.17.0"
+piston_window = "0.73.0"
