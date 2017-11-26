@@ -3,7 +3,7 @@ extern crate image as im;
 extern crate piston_window;
 
 use cgmath::{ InnerSpace, Point3, Vector3 };
-use im::{ RgbaImage };
+use im::{ Rgba, RgbaImage };
 use piston_window::*;
 
 struct Sphere {
@@ -37,6 +37,10 @@ impl Sphere {
         // Return shortest distance along line
         return if t0 < t1 { Some(t0) } else { Some(t1) };
     }
+
+    fn normal(&self, surface_point: Point3<f32>) -> Vector3<f32> {
+        surface_point - self.center
+    }
 }
 
 struct Ray {
@@ -60,12 +64,12 @@ struct Scene {
     spheres: Vec<Sphere>
 }
 
-fn closest_intersection(scene: &Scene, ray: Ray) -> Option<(&Sphere, f32)> {
+fn closest_intersection<'a>(scene: &'a Scene, ray: &Ray) -> Option<(&'a Sphere, f32)> {
     scene.spheres
          .as_slice()
          .into_iter()
          .filter_map(|s| { 
-             let intersection = s.intersects(&ray);
+             let intersection = s.intersects(ray);
              match intersection {
                  Some(i) => {
                      return if i.is_nan() { None } else { Some((s, i)) };
@@ -78,6 +82,21 @@ fn closest_intersection(scene: &Scene, ray: Ray) -> Option<(&Sphere, f32)> {
              let &(s2, i2) = y;
              return i1.partial_cmp(&i2).unwrap(); // Shouldn't ever hit NaN due to check above
          })
+}
+
+fn get_pixel_color(scene: &Scene, ray: &Ray) -> Rgba<u8> {
+    let closest_intersection = closest_intersection(&scene, ray);
+    match closest_intersection {
+        Some(i) => { 
+            let (sphere, ray_distance) = i;
+            let intersection_point = ray.origin + (ray.direction * ray_distance);
+            let normal = sphere.normal(intersection_point);
+            let facing_ratio = 0f32.max(normal.dot(-ray.direction));
+            let shade: u8 = (255.0 * facing_ratio) as u8;
+            return Rgba([shade, shade, shade, 255]);
+        },
+        None => Rgba([0, 0, 0, 255])
+    }
 }
 
 fn render_frame(scene: &Scene, camera: &Camera, render_options: &RenderOptions) -> RgbaImage {
@@ -109,14 +128,8 @@ fn render_frame(scene: &Scene, camera: &Camera, render_options: &RenderOptions) 
             let ray_vector = (px_camera_space - camera.position).normalize();
             let ray = Ray { origin: camera.position, direction: ray_vector };
 
-            let closest_intersection = closest_intersection(&scene, ray);
-            match closest_intersection {
-                Some(i) => {
-                    let p = im::Rgba([0, 0, 0, 255]);
-                    img.put_pixel(px_x, px_y, p);
-                },
-                None => {}
-            }
+            let color = get_pixel_color(scene, &ray);
+            img.put_pixel(px_x, px_y, color);
         }
     }
 
@@ -125,8 +138,8 @@ fn render_frame(scene: &Scene, camera: &Camera, render_options: &RenderOptions) 
 
 fn main() {
     let mut spheres = Vec::new();
-    spheres.push(Sphere { center: Point3 { x: 2.0, y: 0.0, z: -5.0 }, radius: 1.0 });
-    spheres.push(Sphere { center: Point3 { x: 2.0, y: 2.0, z: -4.0 }, radius: 0.9 });
+    spheres.push(Sphere { center: Point3 { x: -2.0, y: 0.0, z: -4.0 }, radius: 1.0 });
+    spheres.push(Sphere { center: Point3 { x: 4.0, y: 2.0, z: -10.0 }, radius: 0.9 });
 
     let mut scene = Scene { spheres: spheres };
 
