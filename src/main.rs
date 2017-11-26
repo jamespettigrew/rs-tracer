@@ -5,6 +5,8 @@ extern crate piston_window;
 use cgmath::{InnerSpace, Point3, Vector3};
 use im::{Rgba, RgbaImage};
 use piston_window::*;
+use std::io::{self, Write};
+use std::time::{Duration, Instant};
 
 struct Sphere {
     center: Point3<f32>,
@@ -106,12 +108,14 @@ fn render_frame(scene: &Scene, camera: &Camera, render_options: &RenderOptions) 
     let aspect_ratio = (render_options.width as f32) / (render_options.height as f32);
     let theta = camera.fov.to_radians() / 2.0;
     let fov_scalar = theta.tan();
+    let w = render_options.width as f32;
+    let h = render_options.height as f32;
 
     for px_x in 0..render_options.width {
         for px_y in 0..render_options.height {
             // Calculate pixel NDC (normalized device coordinates)
-            let px_ndc_x = ((px_x as f32) + 0.5) / (render_options.width as f32);
-            let px_ndc_y = ((px_y as f32) + 0.5) / (render_options.height as f32);
+            let px_ndc_x = ((px_x as f32) + 0.5) / w;
+            let px_ndc_y = ((px_y as f32) + 0.5) / h;
 
             // Calculate pixel screen space coordinates
             let mut px_screen_x = 2.0 * px_ndc_x - 1.0;
@@ -193,9 +197,20 @@ fn main() {
             .unwrap();
 
     window.set_bench_mode(true);
-
+    let mut a = 0;
+    let mut b = 0;
+    let mut c = 0;
+    let mut old = Instant::now();
+    let mut now = Instant::now();
     while let Some(e) = window.next() {
         let frame = render_frame(&scene, &camera, &render_options);
+        now = Instant::now();
+        c = b;
+        b = a;
+        a = now.duration_since(old).subsec_nanos();
+        old = now;
+        print!("\r {:.2} fps", 1000000000.0 / (((a + b + c) / 3) as f64));
+        io::stdout().flush().unwrap();
 
         let texture: G2dTexture =
             Texture::from_image(&mut window.factory, &frame, &TextureSettings::new()).unwrap();
