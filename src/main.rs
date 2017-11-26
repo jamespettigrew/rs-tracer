@@ -12,7 +12,7 @@ struct Sphere {
 }
 
 impl Sphere {
-    fn intersects(&self, ray: &Ray) -> Option<Point3<f32>> {
+    fn intersects(&self, ray: &Ray) -> Option<f32> {
         let radius_squared = self.radius * self.radius;
         let l = self.center - ray.origin;
         let tca = l.dot(ray.direction);
@@ -34,12 +34,8 @@ impl Sphere {
             return None;
         }
 
-        // Return point at shortest distance along line
-        if t0 < t1 {
-            return Some(ray.origin + (ray.direction * t0));
-        }
-        
-        Some(ray.origin + (ray.direction * t1))
+        // Return shortest distance along line
+        return if t0 < t1 { Some(t0) } else { Some(t1) };
     }
 }
 
@@ -64,18 +60,28 @@ struct Scene {
     spheres: Vec<Sphere>
 }
 
-fn intersects(scene: &Scene, ray: Ray) -> bool {
-    return scene.spheres
-                .as_slice()
-                .into_iter()
-                .any(|s| s.intersects(&ray).is_some());
+fn closest_intersection(scene: &Scene, ray: Ray) -> Option<(&Sphere, f32)> {
+    scene.spheres
+         .as_slice()
+         .into_iter()
+         .filter_map(|s| { 
+             let intersection = s.intersects(&ray);
+             match intersection {
+                 Some(i) => {
+                     return if i.is_nan() { None } else { Some((s, i)) };
+                 },
+                 None => None
+             }
+         })
+         .min_by(|x, y| { 
+             let &(s1, i1) = x;
+             let &(s2, i2) = y;
+             return i1.partial_cmp(&i2).unwrap(); // Shouldn't ever hit NaN due to check above
+         })
 }
 
 fn render_frame(scene: &Scene, camera: &Camera, render_options: &RenderOptions) -> RgbaImage {
     let mut img = RgbaImage::new(render_options.width, render_options.height);
-
-    //let vp_right = camera.at.cross(camera.up);
-    //let vp_up = vp_right.cross(camera.at);
 
     let aspect_ratio = (render_options.width as f32) / (render_options.height as f32);
     let theta = camera.fov.to_radians() / 2.0;
@@ -94,7 +100,7 @@ fn render_frame(scene: &Scene, camera: &Camera, render_options: &RenderOptions) 
             // Account for aspect ratio
             px_screen_x = px_screen_x * aspect_ratio;
 
-            // Account for camera Field of View (FoV)
+            // Account for camera FoV (Field of View)
             px_screen_x = px_screen_x * fov_scalar;
             px_screen_y = px_screen_y * fov_scalar;
 
@@ -103,9 +109,13 @@ fn render_frame(scene: &Scene, camera: &Camera, render_options: &RenderOptions) 
             let ray_vector = (px_camera_space - camera.position).normalize();
             let ray = Ray { origin: camera.position, direction: ray_vector };
 
-            if intersects(scene, ray) {
-                let p = im::Rgba([0, 0, 0, 255]);
-                img.put_pixel(px_x, px_y, p);
+            let closest_intersection = closest_intersection(&scene, ray);
+            match closest_intersection {
+                Some(i) => {
+                    let p = im::Rgba([0, 0, 0, 255]);
+                    img.put_pixel(px_x, px_y, p);
+                },
+                None => {}
             }
         }
     }
@@ -137,7 +147,6 @@ fn main() {
             .unwrap();
 
     window.set_bench_mode(true);
-
 
     while let Some(e) = window.next() {
         let frame = render_frame(&scene, &camera, &render_options);
