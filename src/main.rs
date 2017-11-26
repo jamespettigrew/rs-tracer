@@ -66,6 +66,13 @@ struct Scene {
     spheres: Vec<Sphere>,
 }
 
+struct Fps {
+    a: u32,
+    b: u32,
+    c: u32,
+    old: Instant,
+}
+
 fn closest_intersection<'a>(scene: &'a Scene, ray: &Ray) -> Option<(&'a Sphere, f32)> {
     scene
         .spheres
@@ -144,6 +151,19 @@ fn render_frame(scene: &Scene, camera: &Camera, render_options: &RenderOptions) 
     img
 }
 
+fn do_fps(fps: &mut Fps) {
+    let now = Instant::now();
+    fps.c = fps.b;
+    fps.b = fps.a;
+    fps.a = now.duration_since(fps.old).subsec_nanos();
+    fps.old = now;
+    print!(
+        "\r {:.2} fps",
+        1000000000.0 / (((fps.a + fps.b + fps.c) / 3) as f64)
+    );
+    io::stdout().flush().unwrap();
+}
+
 fn main() {
     let mut spheres = Vec::new();
     spheres.push(Sphere {
@@ -197,20 +217,15 @@ fn main() {
             .unwrap();
 
     window.set_bench_mode(true);
-    let mut a = 0;
-    let mut b = 0;
-    let mut c = 0;
-    let mut old = Instant::now();
-    let mut now = Instant::now();
+    let mut fps = Fps {
+        a: 0,
+        b: 0,
+        c: 0,
+        old: Instant::now(),
+    };
     while let Some(e) = window.next() {
         let frame = render_frame(&scene, &camera, &render_options);
-        now = Instant::now();
-        c = b;
-        b = a;
-        a = now.duration_since(old).subsec_nanos();
-        old = now;
-        print!("\r {:.2} fps", 1000000000.0 / (((a + b + c) / 3) as f64));
-        io::stdout().flush().unwrap();
+        do_fps(&mut fps);
 
         let texture: G2dTexture =
             Texture::from_image(&mut window.factory, &frame, &TextureSettings::new()).unwrap();
