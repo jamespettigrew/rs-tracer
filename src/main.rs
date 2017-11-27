@@ -7,7 +7,6 @@ use im::{Rgba, RgbaImage};
 use piston_window::*;
 use std::io::{self, Write};
 use std::time::Instant;
-use std::thread;
 
 struct Sphere {
     center: Point3<f32>,
@@ -133,42 +132,49 @@ fn render_frame(
     render_options: &RenderOptions,
     img: &mut RgbaImage,
 ) {
-
-
     let theta = camera.fov.to_radians() / 2.0;
     let fov_scalar = theta.tan();
     let w = render_options.width as f32;
     let h = render_options.height as f32;
     let aspect_ratio = w / h;
-
-    for px_x in 0..render_options.width {
-        for px_y in 0..render_options.height {
-            // Calculate pixel NDC (normalized device coordinates)
-            let px_ndc_x = ((px_x as f32) + 0.5) / w;
-            let px_ndc_y = ((px_y as f32) + 0.5) / h;
-
-            // Calculate pixel screen space coordinates
-            let mut px_screen_x = 2.0 * px_ndc_x - 1.0;
-            let mut px_screen_y = 1.0 - (2.0 * px_ndc_y);
-
-            // Account for aspect ratio
-            px_screen_x = px_screen_x * aspect_ratio;
-
-            // Account for camera FoV (Field of View)
-            px_screen_x = px_screen_x * fov_scalar;
-            px_screen_y = px_screen_y * fov_scalar;
-
-            let px_camera_space = Point3::new(px_screen_x, px_screen_y, -1.0);
-
-            let ray_vector = (px_camera_space - camera.position).normalize();
-            let ray = Ray {
-                origin: camera.position,
-                direction: ray_vector,
-            };
-
-            let color = get_pixel_color(scene, &ray);
-            img.put_pixel(px_x, px_y, color);
+    let mut px_x = 0;
+    let mut px_y = 0;
+    loop {
+        if px_y >= render_options.height {
+            px_y = 0;
+            px_x = px_x + 1;
         }
+        if px_x >= render_options.width {
+            return;
+        }
+
+        // Calculate pixel NDC (normalized device coordinates)
+        let px_ndc_x = ((px_x as f32) + 0.5) / w;
+        let px_ndc_y = ((px_y as f32) + 0.5) / h;
+
+        // Calculate pixel screen space coordinates
+        let mut px_screen_x = 2.0 * px_ndc_x - 1.0;
+        let mut px_screen_y = 1.0 - (2.0 * px_ndc_y);
+
+        // Account for aspect ratio
+        px_screen_x = px_screen_x * aspect_ratio;
+
+        // Account for camera FoV (Field of View)
+        px_screen_x = px_screen_x * fov_scalar;
+        px_screen_y = px_screen_y * fov_scalar;
+
+        let px_camera_space = Point3::new(px_screen_x, px_screen_y, -1.0);
+
+        let ray_vector = (px_camera_space - camera.position).normalize();
+        let ray = Ray {
+            origin: camera.position,
+            direction: ray_vector,
+        };
+
+        let color = get_pixel_color(scene, &ray);
+
+        img.put_pixel(px_x, px_y, color);
+        px_y = px_y + 1;
     }
 }
 
