@@ -174,7 +174,7 @@ fn render_frame(
         let color = get_pixel_color(scene, &ray);
         if color == Rgba([0, 0, 0, 255]) && px_y + 6 < render_options.height {
             px_y = px_y + 5;
-            for a in 1..5 {
+            for a in 1..6 {
                 img.put_pixel(px_x, px_y - a, color);
             }
         }
