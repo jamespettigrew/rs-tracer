@@ -6,7 +6,8 @@ use cgmath::{InnerSpace, Point3, Vector3};
 use im::{Rgba, RgbaImage};
 use piston_window::*;
 use std::io::{self, Write};
-use std::time::{Duration, Instant};
+use std::time::Instant;
+use std::thread;
 
 struct Sphere {
     center: Point3<f32>,
@@ -15,6 +16,7 @@ struct Sphere {
 
 impl Sphere {
     fn intersects(&self, ray: &Ray) -> Option<f32> {
+        //This method has next to no effect on fps
         let radius_squared = self.radius * self.radius;
         let l = self.center - ray.origin;
         let tca = l.dot(ray.direction);
@@ -57,6 +59,7 @@ struct Camera {
     fov: f32,
 }
 
+
 struct RenderOptions {
     width: u32,
     height: u32,
@@ -71,6 +74,21 @@ struct Fps {
     b: u32,
     c: u32,
     old: Instant,
+}
+
+impl Fps {
+    fn tick(&mut self) {
+        let now = Instant::now();
+        self.c = self.b;
+        self.b = self.a;
+        self.a = now.duration_since(self.old).subsec_nanos();
+        self.old = now;
+        print!(
+            "\r {:.2} fps",
+            1000000000.0 / (((self.a + self.b + self.c) / 3) as f64)
+        );
+        io::stdout().flush().unwrap();
+    }
 }
 
 fn closest_intersection<'a>(scene: &'a Scene, ray: &Ray) -> Option<(&'a Sphere, f32)> {
@@ -109,14 +127,19 @@ fn get_pixel_color(scene: &Scene, ray: &Ray) -> Rgba<u8> {
     }
 }
 
-fn render_frame(scene: &Scene, camera: &Camera, render_options: &RenderOptions) -> RgbaImage {
-    let mut img = RgbaImage::new(render_options.width, render_options.height);
+fn render_frame(
+    scene: &Scene,
+    camera: &Camera,
+    render_options: &RenderOptions,
+    img: &mut RgbaImage,
+) {
 
-    let aspect_ratio = (render_options.width as f32) / (render_options.height as f32);
+
     let theta = camera.fov.to_radians() / 2.0;
     let fov_scalar = theta.tan();
     let w = render_options.width as f32;
     let h = render_options.height as f32;
+    let aspect_ratio = w / h;
 
     for px_x in 0..render_options.width {
         for px_y in 0..render_options.height {
@@ -147,22 +170,9 @@ fn render_frame(scene: &Scene, camera: &Camera, render_options: &RenderOptions) 
             img.put_pixel(px_x, px_y, color);
         }
     }
-
-    img
 }
 
-fn do_fps(fps: &mut Fps) {
-    let now = Instant::now();
-    fps.c = fps.b;
-    fps.b = fps.a;
-    fps.a = now.duration_since(fps.old).subsec_nanos();
-    fps.old = now;
-    print!(
-        "\r {:.2} fps",
-        1000000000.0 / (((fps.a + fps.b + fps.c) / 3) as f64)
-    );
-    io::stdout().flush().unwrap();
-}
+
 
 fn main() {
     let mut spheres = Vec::new();
@@ -223,9 +233,12 @@ fn main() {
         c: 0,
         old: Instant::now(),
     };
+
+    let mut frame = RgbaImage::new(render_options.width, render_options.height);
     while let Some(e) = window.next() {
-        let frame = render_frame(&scene, &camera, &render_options);
-        do_fps(&mut fps);
+        //Removing render frame gives ~300x fps
+        render_frame(&scene, &camera, &render_options, &mut frame);
+        fps.tick();
 
         let texture: G2dTexture =
             Texture::from_image(&mut window.factory, &frame, &TextureSettings::new()).unwrap();
