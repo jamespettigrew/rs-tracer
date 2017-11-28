@@ -250,14 +250,15 @@ fn main() {
         print!("{}", fps);
         let _ = io::stdout().flush(); // Don't care if flush fails
 
-        let texture: G2dTexture =
-            Texture::from_image(&mut window.factory, &frame, &TextureSettings::new()).unwrap();
-
-        window.draw_2d(&e, |c, g| {
-            clear([1.0; 4], g);
-            image(&texture, c.transform, g);
-        });
-
+        match Texture::from_image(&mut window.factory, &frame, &TextureSettings::new()) {
+            Ok(texture) => {
+                window.draw_2d(&e, |c, g| {
+                    clear([1.0; 4], g);
+                    image(&texture, c.transform, g);
+                });
+            }
+            Err(why) => print!("Failed to produce frame texture"),
+        };
         scene.spheres[0].center.z -= 0.01;
         scene.spheres[1].center.z -= 0.015;
     }
