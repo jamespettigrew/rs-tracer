@@ -5,6 +5,7 @@ extern crate piston_window;
 use cgmath::{InnerSpace, Point3, Vector3};
 use im::{Rgba, RgbaImage};
 use piston_window::*;
+use std::fmt;
 use std::io::{self, Write};
 use std::time::Instant;
 
@@ -82,11 +83,13 @@ impl Fps {
         self.b = self.a;
         self.a = now.duration_since(self.old).subsec_nanos();
         self.old = now;
-        print!(
-            "\r {:.2} fps",
-            1000000000.0 / (((self.a + self.b + self.c) / 3) as f64)
-        );
-        io::stdout().flush().unwrap();
+    }
+}
+
+impl fmt::Display for Fps {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let fps = 1000000000.0 / (((self.a + self.b + self.c) / 3) as f64);
+        write!(f, "\r {:.2} fps", fps)
     }
 }
 
@@ -242,7 +245,10 @@ fn main() {
     while let Some(e) = window.next() {
         //Removing render frame gives ~300x fps
         render_frame(&scene, &camera, &render_options, &mut frame);
+
         fps.tick();
+        print!("{}", fps);
+        let _ = io::stdout().flush(); // Don't care if flush fails
 
         let texture: G2dTexture =
             Texture::from_image(&mut window.factory, &frame, &TextureSettings::new()).unwrap();
