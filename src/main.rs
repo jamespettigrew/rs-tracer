@@ -5,6 +5,7 @@ extern crate piston_window;
 use cgmath::{InnerSpace, Point3, Vector3};
 use im::{Rgba, RgbaImage};
 use piston_window::*;
+use std::cmp::Ordering;
 use std::fmt;
 use std::io::{self, Write};
 use std::time::Instant;
@@ -98,19 +99,24 @@ fn closest_intersection<'a>(scene: &'a Scene, ray: &Ray) -> Option<(&'a Sphere, 
         .spheres
         .as_slice()
         .into_iter()
-        .filter_map(|s| {
-            let intersection = s.intersects(ray);
-            match intersection {
-                Some(i) => {
-                    return if i.is_nan() { None } else { Some((s, i)) };
+        .fold(None, |closest, next| match next.intersects(ray) {
+            None => closest,
+            Some(i) => {
+                if i.is_nan() {
+                    return closest;
                 }
-                None => None,
+
+                match closest {
+                    Some((_, distance)) => {
+                        match distance.partial_cmp(&i).unwrap_or(Ordering::Equal) {
+                            Ordering::Less => closest,
+                            Ordering::Equal => closest,
+                            Ordering::Greater => Some((next, i)),
+                        }
+                    }
+                    None => Some((next, i)),
+                }
             }
-        })
-        .min_by(|x, y| {
-            let &(s1, i1) = x;
-            let &(s2, i2) = y;
-            return i1.partial_cmp(&i2).unwrap(); // Shouldn't ever hit NaN due to check above
         })
 }
 
