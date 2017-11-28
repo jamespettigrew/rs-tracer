@@ -231,7 +231,7 @@ fn main() {
             .exit_on_esc(true)
             .opengl(opengl)
             .build()
-            .unwrap();
+            .expect("Failed to create application window");
 
     window.set_bench_mode(true);
     let mut fps = Fps {
